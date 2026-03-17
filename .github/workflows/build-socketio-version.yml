@@ -1,0 +1,244 @@
+name: Build Specific Socket.IO Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      socketio_version:
+        description: 'Socket.IO version to build (e.g., 2.1.0, 2.0.1)'
+        required: true
+        default: '2.1.0'
+      create_release:
+        description: 'Create GitHub release after successful build?'
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  build-version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Make scripts executable
+        run: chmod +x scripts/*.sh
+
+      - name: Update version in gradle.properties
+        run: |
+          echo "Building Socket.IO version: ${{ github.event.inputs.socketio_version }}"
+          sed -i 's/^UPSTREAM_VERSION=.*/UPSTREAM_VERSION=${{ github.event.inputs.socketio_version }}/' gradle.properties
+          sed -i 's/^VERSION_NAME=.*/VERSION_NAME=${{ github.event.inputs.socketio_version }}/' gradle.properties
+          echo ""
+          echo "Updated gradle.properties:"
+          grep -E "UPSTREAM_VERSION|VERSION_NAME" gradle.properties
+
+      - name: Build release AAR
+        run: ./scripts/build-release.sh
+        env:
+          UPSTREAM_VERSION: ${{ github.event.inputs.socketio_version }}
+
+      - name: Verify AAR contents
+        run: |
+          echo "=== AAR Contents ==="
+          unzip -l build/outputs/sio-android-scx-release.aar
+          echo ""
+          echo "=== Verifying package prefixes ==="
+          TEMP_DIR=$(mktemp -d)
+          cd $TEMP_DIR
+          unzip -q $GITHUB_WORKSPACE/build/outputs/sio-android-scx-release.aar libs/shadow.jar
+
+          # Check for prefixed classes
+          PREFIXED_COUNT=$(jar tf libs/shadow.jar | grep -c "cx/smile/" || echo "0")
+          echo "Found $PREFIXED_COUNT prefixed classes (cx/smile/)"
+
+          if [ "$PREFIXED_COUNT" -lt 100 ]; then
+            echo "✗ ERROR: Expected at least 100 prefixed classes, found $PREFIXED_COUNT"
+            exit 1
+          fi
+
+          # Check for Socket.IO classes
+          SOCKET_COUNT=$(jar tf libs/shadow.jar | grep -c "cx/smile/io/socket/" || echo "0")
+          echo "Socket.IO classes: $SOCKET_COUNT"
+
+          # Sample of prefixed classes
+          echo ""
+          echo "=== Sample Prefixed Classes ==="
+          jar tf libs/shadow.jar | grep "cx/smile/io/socket/client" | head -10
+
+          # Check for unprefixed classes (should be empty)
+          echo ""
+          echo "=== Checking for unprefixed classes (should be empty) ==="
+          UNPREFIXED=$(jar tf libs/shadow.jar | grep -E "^(io/socket|io/engine|okhttp3|okio)/" || echo "")
+          if [ -z "$UNPREFIXED" ]; then
+            echo "✓ No unprefixed classes found"
+          else
+            echo "✗ ERROR: Found unprefixed classes:"
+            echo "$UNPREFIXED"
+            exit 1
+          fi
+
+          cd $GITHUB_WORKSPACE
+          rm -rf $TEMP_DIR
+
+      - name: Rename AAR with version
+        run: |
+          cd build/outputs
+          cp sio-android-scx-release.aar sio-android-scx-${{ github.event.inputs.socketio_version }}.aar
+          echo "Created: sio-android-scx-${{ github.event.inputs.socketio_version }}.aar"
+
+      - name: Generate checksum
+        run: |
+          cd build/outputs
+          sha256sum sio-android-scx-${{ github.event.inputs.socketio_version }}.aar > sio-android-scx-${{ github.event.inputs.socketio_version }}.aar.sha256
+
+      - name: Copy license files
+        run: |
+          cp LICENSE build/outputs/LICENSE.txt
+          cp NOTICE build/outputs/NOTICE.txt
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sio-android-scx-${{ github.event.inputs.socketio_version }}
+          path: |
+            build/outputs/sio-android-scx-${{ github.event.inputs.socketio_version }}.aar
+            build/outputs/sio-android-scx-${{ github.event.inputs.socketio_version }}.aar.sha256
+            build/outputs/LICENSE.txt
+            build/outputs/NOTICE.txt
+          retention-days: 90
+
+      - name: Create and push tag
+        if: ${{ github.event.inputs.create_release == 'true' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ github.event.inputs.socketio_version }}" -m "Socket.IO v${{ github.event.inputs.socketio_version }}"
+          git push origin "v${{ github.event.inputs.socketio_version }}"
+
+      - name: Create GitHub Release
+        if: ${{ github.event.inputs.create_release == 'true' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.event.inputs.socketio_version }}
+          name: Socket.IO v${{ github.event.inputs.socketio_version }} (Prefixed)
+          body: |
+            ## SCX Socket.IO Client v${{ github.event.inputs.socketio_version }}
+
+            Prefixed distribution of **Socket.IO Client v${{ github.event.inputs.socketio_version }}** for Android.
+
+            **Important**: This is not an official Socket.IO release. This distribution includes Socket.IO Client and its dependencies with package relocation applied to prevent symbol collisions.
+
+            ### Features
+            - ✅ Based on Socket.IO Client for Java **v${{ github.event.inputs.socketio_version }}**
+            - ✅ Java package prefix: `cx.smile.*`
+            - ✅ All transitive dependencies relocated (OkHttp, Okio, org.json)
+            - ✅ Bundled as single AAR (~700KB)
+            - ✅ No symbol collisions with other Socket.IO instances
+
+            ### Installation
+
+            #### Via JitPack
+            ```gradle
+            repositories {
+                maven { url 'https://jitpack.io' }
+            }
+
+            dependencies {
+                implementation 'com.github.smile-cx:sio-android-scx:v${{ github.event.inputs.socketio_version }}'
+            }
+            ```
+
+            #### Direct Download
+            Download `sio-android-scx-${{ github.event.inputs.socketio_version }}.aar` from the assets below.
+
+            ### Usage Example
+
+            ```kotlin
+            import cx.smile.io.socket.client.IO
+            import cx.smile.io.socket.client.Socket
+
+            val socket = IO.socket("http://localhost:3000")
+            socket.connect()
+
+            socket.on(Socket.EVENT_CONNECT) {
+                println("Connected!")
+            }
+
+            socket.emit("message", "Hello, Server!")
+            ```
+
+            ### What's Different from Upstream?
+
+            | Original | Prefixed |
+            |----------|----------|
+            | `io.socket.*` | `cx.smile.io.socket.*` |
+            | `io.engine.*` | `cx.smile.io.engine.*` |
+            | `okhttp3.*` | `cx.smile.okhttp3.*` |
+            | `okio.*` | `cx.smile.okio.*` |
+            | `org.json.*` | `cx.smile.org.json.*` |
+
+            All functionality remains identical - only package names changed.
+
+            ### License and Attribution
+            This distribution bundles modified third-party software. See `LICENSE.txt` and `NOTICE.txt` in the release assets for complete license texts and attribution notices.
+
+            ### Bundled Components
+            - Socket.IO Client for Java v${{ github.event.inputs.socketio_version }} (MIT)
+            - Engine.IO Client for Java (MIT)
+            - OkHttp (Apache 2.0)
+            - Okio (Apache 2.0)
+            - JSON in Java (Custom License)
+
+            All components redistributed with package relocation via Gradle Shadow plugin.
+
+            ### Checksums
+            SHA-256: See `sio-android-scx-${{ github.event.inputs.socketio_version }}.aar.sha256`
+
+            ### Upstream
+            Official Socket.IO Client: https://github.com/socketio/socket.io-client-java/releases/tag/${{ github.event.inputs.socketio_version }}
+          files: |
+            build/outputs/sio-android-scx-${{ github.event.inputs.socketio_version }}.aar
+            build/outputs/sio-android-scx-${{ github.event.inputs.socketio_version }}.aar.sha256
+            build/outputs/LICENSE.txt
+            build/outputs/NOTICE.txt
+          draft: false
+          prerelease: false
+
+      - name: Build Summary
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Successfully built Socket.IO v${{ github.event.inputs.socketio_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- \`sio-android-scx-${{ github.event.inputs.socketio_version }}.aar\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Size: $(ls -lh build/outputs/sio-android-scx-${{ github.event.inputs.socketio_version }}.aar | awk '{print $5}')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event.inputs.create_release }}" == "true" ]; then
+            echo "### Release" >> $GITHUB_STEP_SUMMARY
+            echo "✅ GitHub release created: https://github.com/${{ github.repository }}/releases/tag/v${{ github.event.inputs.socketio_version }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+            echo "Artifacts uploaded. To create a release, re-run with 'Create GitHub release' enabled." >> $GITHUB_STEP_SUMMARY
+          fi
