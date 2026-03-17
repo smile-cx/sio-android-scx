@@ -46,10 +46,28 @@ jobs:
       - name: Verify package prefixing
         run: |
           echo "=== Verifying package prefixes ==="
-          unzip -p build/outputs/sio-android-scx-release.aar classes.jar | jar tf - | grep -E "^cx/smile/" | head -20
+          # Extract shadow.jar from AAR
+          TEMP_DIR=$(mktemp -d)
+          cd $TEMP_DIR
+          unzip -q $GITHUB_WORKSPACE/build/outputs/sio-android-scx-release.aar libs/shadow.jar
+
+          # Check for prefixed classes
+          echo "Sample prefixed classes:"
+          jar tf libs/shadow.jar | grep "cx/smile/io/socket/client" | head -10
+
+          # Check for unprefixed classes
           echo ""
           echo "=== Checking for unprefixed classes (should be empty) ==="
-          unzip -p build/outputs/sio-android-scx-release.aar classes.jar | jar tf - | grep -E "^io/socket/" | head -10 || echo "✓ No unprefixed classes found"
+          UNPREFIXED=$(jar tf libs/shadow.jar | grep -E "^(io/socket|io/engine|okhttp3|okio)/" || echo "")
+          if [ -z "$UNPREFIXED" ]; then
+            echo "✓ No unprefixed classes found"
+          else
+            echo "✗ ERROR: Found unprefixed classes"
+            exit 1
+          fi
+
+          cd $GITHUB_WORKSPACE
+          rm -rf $TEMP_DIR
 
       - name: Upload test artifacts
         uses: actions/upload-artifact@v4
