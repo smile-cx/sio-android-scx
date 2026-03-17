@@ -1,18 +1,15 @@
 name: Build and Release
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to build'
+        description: 'Version to release (e.g., 2.1.0)'
         required: true
         default: '2.1.0'
 
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -39,25 +36,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Cache upstream source
-        uses: actions/cache@v4
-        with:
-          path: upstream-source
-          key: ${{ runner.os }}-upstream-${{ github.event.inputs.version || '2.1.0' }}
-
       - name: Make scripts executable
         run: chmod +x scripts/*.sh
 
-      - name: Set upstream version
-        run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            echo "UPSTREAM_VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
-          else
-            echo "UPSTREAM_VERSION=2.1.0" >> $GITHUB_ENV
-          fi
-
       - name: Build release AAR
         run: ./scripts/build-release.sh
+        env:
+          UPSTREAM_VERSION: ${{ github.event.inputs.version }}
 
       - name: Verify AAR contents
         run: |
@@ -108,26 +93,21 @@ jobs:
           cp LICENSE build/outputs/LICENSE.txt
           cp NOTICE build/outputs/NOTICE.txt
 
-      - name: Extract version from tag
-        id: extract_version
+      - name: Create and push tag
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-          else
-            VERSION="v${{ github.event.inputs.version || '2.1.0' }}"
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ github.event.inputs.version }}" -m "Release v${{ github.event.inputs.version }}"
+          git push origin "v${{ github.event.inputs.version }}"
 
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ steps.extract_version.outputs.version }}
-          release_name: Release ${{ steps.extract_version.outputs.version }}
+          tag_name: v${{ github.event.inputs.version }}
+          name: Release v${{ github.event.inputs.version }}
           body: |
-            ## SCX Socket.IO Client ${{ steps.extract_version.outputs.version }}
+            ## SCX Socket.IO Client v${{ github.event.inputs.version }}
 
             Modified and prefixed distribution of Socket.IO Client for Java.
 
@@ -147,7 +127,7 @@ jobs:
             }
 
             dependencies {
-                implementation 'com.github.smile-cx:sio-android-scx:${{ steps.extract_version.outputs.version }}'
+                implementation 'com.github.smile-cx:sio-android-scx:v${{ github.event.inputs.version }}'
             }
             ```
 
@@ -158,7 +138,7 @@ jobs:
             This distribution bundles modified third-party software. See LICENSE.txt and NOTICE.txt in the release assets for complete license texts and attribution notices.
 
             ### Bundled Components
-            - Socket.IO Client for Java (MIT)
+            - Socket.IO Client for Java v${{ github.event.inputs.version }} (MIT)
             - Engine.IO Client for Java (MIT)
             - OkHttp (Apache 2.0)
             - Okio (Apache 2.0)
@@ -168,48 +148,13 @@ jobs:
 
             ### Checksums
             See `sio-android-scx-release.aar.sha256` for SHA-256 checksum.
+          files: |
+            build/outputs/sio-android-scx-release.aar
+            build/outputs/sio-android-scx-release.aar.sha256
+            build/outputs/LICENSE.txt
+            build/outputs/NOTICE.txt
           draft: false
           prerelease: false
-
-      - name: Upload AAR to Release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./build/outputs/sio-android-scx-release.aar
-          asset_name: sio-android-scx-release.aar
-          asset_content_type: application/octet-stream
-
-      - name: Upload Checksum to Release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./build/outputs/sio-android-scx-release.aar.sha256
-          asset_name: sio-android-scx-release.aar.sha256
-          asset_content_type: text/plain
-
-      - name: Upload LICENSE to Release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./build/outputs/LICENSE.txt
-          asset_name: LICENSE.txt
-          asset_content_type: text/plain
-
-      - name: Upload NOTICE to Release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./build/outputs/NOTICE.txt
-          asset_name: NOTICE.txt
-          asset_content_type: text/plain
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
