@@ -1,0 +1,191 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build'
+        required: true
+        default: '2.1.0'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Cache upstream source
+        uses: actions/cache@v4
+        with:
+          path: upstream-source
+          key: ${{ runner.os }}-upstream-${{ github.event.inputs.version || '2.1.0' }}
+
+      - name: Make scripts executable
+        run: chmod +x scripts/*.sh
+
+      - name: Set upstream version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "UPSTREAM_VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          else
+            echo "UPSTREAM_VERSION=2.1.0" >> $GITHUB_ENV
+          fi
+
+      - name: Build release AAR
+        run: ./scripts/build-release.sh
+
+      - name: Verify AAR contents
+        run: |
+          echo "=== AAR Contents ==="
+          unzip -l build/outputs/sio-android-scx-release.aar
+          echo ""
+          echo "=== Native Libraries ==="
+          unzip -l build/outputs/sio-android-scx-release.aar | grep -E "\\.so$" || echo "No native libraries found"
+          echo ""
+          echo "=== JAR Classes Sample ==="
+          unzip -p build/outputs/sio-android-scx-release.aar classes.jar | jar tf - | grep "cx/smile" | head -20
+
+      - name: Generate checksum
+        run: |
+          cd build/outputs
+          sha256sum sio-android-scx-release.aar > sio-android-scx-release.aar.sha256
+
+      - name: Copy license files to release output
+        run: |
+          cp LICENSE build/outputs/LICENSE.txt
+          cp NOTICE build/outputs/NOTICE.txt
+
+      - name: Extract version from tag
+        id: extract_version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION="v${{ github.event.inputs.version || '2.1.0' }}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.extract_version.outputs.version }}
+          release_name: Release ${{ steps.extract_version.outputs.version }}
+          body: |
+            ## SCX Socket.IO Client ${{ steps.extract_version.outputs.version }}
+
+            Modified and prefixed distribution of Socket.IO Client for Java.
+
+            **Important**: This is not an official Socket.IO release. This distribution includes Socket.IO Client and its dependencies with package relocation applied.
+
+            ### Features
+            - Java package prefix: `cx.smile.`
+            - All transitive dependencies relocated (OkHttp, Okio, org.json)
+            - Bundled as single AAR for easy integration
+
+            ### Installation
+
+            #### Via JitPack
+            ```gradle
+            repositories {
+                maven { url 'https://jitpack.io' }
+            }
+
+            dependencies {
+                implementation 'com.github.smile-cx:sio-android-scx:${{ steps.extract_version.outputs.version }}'
+            }
+            ```
+
+            #### Direct Download
+            Download the AAR from the assets below.
+
+            ### License and Attribution
+            This distribution bundles modified third-party software. See LICENSE.txt and NOTICE.txt in the release assets for complete license texts and attribution notices.
+
+            ### Bundled Components
+            - Socket.IO Client for Java (MIT)
+            - Engine.IO Client for Java (MIT)
+            - OkHttp (Apache 2.0)
+            - Okio (Apache 2.0)
+            - JSON in Java (Custom License)
+
+            All components are redistributed with package relocation applied via Gradle Shadow plugin.
+
+            ### Checksums
+            See `sio-android-scx-release.aar.sha256` for SHA-256 checksum.
+          draft: false
+          prerelease: false
+
+      - name: Upload AAR to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/outputs/sio-android-scx-release.aar
+          asset_name: sio-android-scx-release.aar
+          asset_content_type: application/octet-stream
+
+      - name: Upload Checksum to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/outputs/sio-android-scx-release.aar.sha256
+          asset_name: sio-android-scx-release.aar.sha256
+          asset_content_type: text/plain
+
+      - name: Upload LICENSE to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/outputs/LICENSE.txt
+          asset_name: LICENSE.txt
+          asset_content_type: text/plain
+
+      - name: Upload NOTICE to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/outputs/NOTICE.txt
+          asset_name: NOTICE.txt
+          asset_content_type: text/plain
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sio-android-scx-aar
+          path: build/outputs/sio-android-scx-release.aar
+          retention-days: 30

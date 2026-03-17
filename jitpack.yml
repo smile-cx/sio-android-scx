@@ -1,0 +1,18 @@
+# JitPack build configuration for SCX Socket.IO Client
+# This distribution bundles modified third-party software.
+# See LICENSE and NOTICE files for complete license texts and attribution.
+
+jdk:
+  - openjdk11
+
+before_install:
+  - chmod +x scripts/*.sh
+
+install:
+  # Socket.IO Client Java is pure Java (no native compilation)
+  # Build is fast - just download from Maven Central and relocate packages
+  - ./gradlew clean :shadow:shadowJar :app:assembleRelease
+
+# JitPack will automatically publish the AAR
+env:
+  GRADLE_OPTS: "-Xmx4096m -XX:MaxPermSize=1024m -XX:+HeapDumpOnOutOfMemoryError"

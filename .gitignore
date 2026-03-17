@@ -1,0 +1,33 @@
+# Gradle
+.gradle/
+build/
+*/build/
+gradle-app.setting
+!gradle-wrapper.jar
+.gradletasknamecache
+
+# Android
+*.apk
+*.aab
+*.ap_
+*.dex
+local.properties
+*.iml
+.idea/
+*.hprof
+.cxx/
+.externalNativeBuild/
+captures/
+output.json
+
+# NDK
+obj/
+.externalNativeBuild
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Downloaded source
+upstream-source/
+extracted/
