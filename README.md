@@ -88,11 +88,9 @@ This distribution bundles the following third-party software:
    - Copyright (c) Square, Inc.
    - Modified: Package relocation from `okio.*` to `cx.smile.okio.*`
 
-5. **JSON in Java** (Custom License - "Good, not Evil")
-   - Copyright (c) 2002 JSON.org
-   - Modified: Package relocation from `org.json.*` to `cx.smile.org.json.*`
-
 All modifications are limited to package namespace changes via Gradle Shadow plugin bytecode rewriting. No functional changes have been made to the original libraries.
+
+**Note**: This distribution uses `org.json` from the Android SDK (not bundled). Socket.IO's dependency on org.json is satisfied by the platform-provided implementation.
 
 ### License Files
 

@@ -66,7 +66,7 @@ afterEvaluate {
 
                 pom {
                     name.set("SCX Socket.IO Client")
-                    description.set("Modified Socket.IO client for Android with package relocation to avoid symbol collisions. Bundles Socket.IO (MIT), OkHttp/Okio (Apache 2.0), and org.json. See LICENSE and NOTICE for complete attribution.")
+                    description.set("Modified Socket.IO client for Android with package relocation to avoid symbol collisions. Bundles Socket.IO (MIT) and OkHttp/Okio (Apache 2.0). Uses org.json from Android SDK. See LICENSE and NOTICE for complete attribution.")
                     url.set("https://github.com/smile-cx/sio-android-scx")
 
                     licenses {

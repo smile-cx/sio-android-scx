@@ -198,9 +198,10 @@ jobs:
             | `io.engine.*` | `cx.smile.io.engine.*` |
             | `okhttp3.*` | `cx.smile.okhttp3.*` |
             | `okio.*` | `cx.smile.okio.*` |
-            | `org.json.*` | `cx.smile.org.json.*` |
 
             All functionality remains identical - only package names changed.
+
+            **Note:** `org.json` is provided by the Android SDK and not bundled in this distribution.
 
             ### License and Attribution
             This distribution bundles modified third-party software. See `LICENSE.txt` and `NOTICE.txt` in the release assets for complete license texts and attribution notices.
@@ -210,9 +211,10 @@ jobs:
             - Engine.IO Client for Java (MIT)
             - OkHttp (Apache 2.0)
             - Okio (Apache 2.0)
-            - JSON in Java (Custom License)
 
             All components redistributed with package relocation via Gradle Shadow plugin.
+
+            **Note:** Uses `org.json` from Android SDK (not bundled).
 
             ### Checksums
             SHA-256: See `sio-android-scx-${{ github.event.inputs.socketio_version }}.aar.sha256`

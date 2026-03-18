@@ -166,7 +166,8 @@ jobs:
 
             ### Features
             - Java package prefix: `cx.smile.`
-            - All transitive dependencies relocated (OkHttp, Okio, org.json)
+            - All transitive dependencies relocated (OkHttp, Okio)
+            - Uses `org.json` from Android SDK
             - Bundled as single AAR for easy integration
 
             ### Installation
@@ -193,9 +194,10 @@ jobs:
             - Engine.IO Client for Java (MIT)
             - OkHttp (Apache 2.0)
             - Okio (Apache 2.0)
-            - JSON in Java (Custom License)
 
             All components are redistributed with package relocation applied via Gradle Shadow plugin.
+
+            **Note:** Uses `org.json` from Android SDK (not bundled).
 
             ### Checksums
             See `sio-android-scx-release.aar.sha256` for SHA-256 checksum.

@@ -26,7 +26,7 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
     // Relocate transitive dependencies to avoid conflicts
     relocate("okhttp3", "cx.smile.okhttp3")
     relocate("okio", "cx.smile.okio")
-    relocate("org.json", "cx.smile.org.json")
+    // Note: org.json is part of Android SDK, no relocation needed
 
     // Don't minimize - keep all classes
     // minimize() can cause issues with reflection and service loading
