@@ -36,7 +36,7 @@ Download the prefixed AAR from [Releases](../../releases).
 
 ### Prerequisites
 
-- JDK 11+
+- JDK 17+
 - Android SDK (API 21+)
 - Gradle 8.0+
 
@@ -52,9 +52,9 @@ This will produce `sio-android-scx-release.aar` in `app/build/outputs/aar/`.
 
 This build pipeline uses a streamlined approach:
 
-1. **Download**: Fetch Socket.IO client from Maven Central
+1. **Download**: Fetch Socket.IO client from Maven Central via Gradle dependency
 2. **Relocation**: Shadow plugin relocates Java packages via bytecode rewriting
-3. **Packaging**: Fat AAR plugin packages the relocated library for Android distribution
+3. **Packaging**: Embed shadowed JAR into Android AAR library
 
 ## CI/CD
 
