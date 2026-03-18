@@ -1,6 +1,6 @@
 # SCX Socket.IO Client for Android
 
-Modified and prefixed distribution of [socket.io-client-java](https://github.com/socketio/socket.io-client-java) to avoid symbol collisions.
+Modified distribution of [socket.io-client-java](https://github.com/socketio/socket.io-client-java) with package relocation to avoid symbol collisions.
 
 **Note**: This is not an official Socket.IO distribution. This repository redistributes Socket.IO Client for Java and its dependencies with package relocation applied. All original libraries are modified through bytecode transformation to add the `cx.smile.` package prefix.
 
@@ -8,7 +8,7 @@ Modified and prefixed distribution of [socket.io-client-java](https://github.com
 
 - **Java Package Prefix**: `cx.smile.` (e.g., `cx.smile.io.socket.client`)
 - **Bytecode Relocation**: All package references updated automatically
-- **Transitive Dependencies**: okhttp3, okio, and other dependencies also prefixed
+- **Transitive Dependencies**: okhttp3 and okio also relocated
 
 ## Distribution
 
@@ -30,7 +30,7 @@ dependencies {
 
 ### Via GitHub Releases
 
-Download the prefixed AAR from [Releases](../../releases).
+Download the AAR from [Releases](../../releases).
 
 ## Building from Source
 
@@ -59,7 +59,7 @@ This build pipeline uses a streamlined approach:
 ## CI/CD
 
 GitHub Actions automatically:
-- Builds prefixed AAR on push to tags
+- Builds AAR on push to tags
 - Uploads artifacts to GitHub Releases
 - Enables JitPack distribution
 
@@ -96,12 +96,10 @@ All modifications are limited to package namespace changes via Gradle Shadow plu
 
 - [LICENSE](LICENSE) - Complete license texts for all components
 - [NOTICE](NOTICE) - Detailed attribution and modification notices
-- [UPSTREAM_LICENSE](UPSTREAM_LICENSE) - Original Socket.IO Client license (preserved for reference)
 
 Users of this distribution must comply with all applicable license terms, including:
 - Preserving copyright notices and license texts in redistributions
 - Including the NOTICE file in distributions
 - Complying with Apache 2.0 requirements for OkHttp and Okio
-- Complying with the JSON.org license terms
 
 For the official, unmodified Socket.IO Client for Java, see: https://github.com/socketio/socket.io-client-java

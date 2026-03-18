@@ -160,7 +160,7 @@ jobs:
           body: |
             ## SCX Socket.IO Client v${{ github.event.inputs.version }}
 
-            Modified and prefixed distribution of Socket.IO Client for Java.
+            Modified distribution of Socket.IO Client for Java with package relocation.
 
             **Important**: This is not an official Socket.IO release. This distribution includes Socket.IO Client and its dependencies with package relocation applied.
 

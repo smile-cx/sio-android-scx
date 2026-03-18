@@ -143,11 +143,11 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ github.event.inputs.socketio_version }}
-          name: Socket.IO v${{ github.event.inputs.socketio_version }} (Prefixed)
+          name: Socket.IO v${{ github.event.inputs.socketio_version }}
           body: |
             ## SCX Socket.IO Client v${{ github.event.inputs.socketio_version }}
 
-            Prefixed distribution of **Socket.IO Client v${{ github.event.inputs.socketio_version }}** for Android.
+            Modified distribution of **Socket.IO Client v${{ github.event.inputs.socketio_version }}** for Android with package relocation.
 
             **Important**: This is not an official Socket.IO release. This distribution includes Socket.IO Client and its dependencies with package relocation applied to prevent symbol collisions.
 
