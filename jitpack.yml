@@ -1,4 +1,6 @@
 # JitPack build configuration for SCX Socket.IO Client
+# Note: The AAR from GitHub releases is already shadowed by the workflow.
+# JitPack just republishes it as a Maven artifact (faster, no redundant shadowing).
 # This distribution bundles modified third-party software.
 # See LICENSE and NOTICE files for complete license texts and attribution.
 
@@ -6,12 +8,58 @@ jdk:
   - openjdk17
 
 before_install:
-  - chmod +x scripts/*.sh
+  - echo "JitPack republishing pre-shadowed AAR"
 
 install:
-  # Socket.IO Client Java is pure Java (no native compilation)
-  # Build is fast - just download from Maven Central and relocate packages
-  - ./gradlew clean :shadow:shadowJar :app:assembleRelease
+  - echo "Downloading pre-shadowed AAR from GitHub releases..."
+  - |
+    # Extract version from git tag
+    VERSION=${JITPACK_GIT_TAG:-${JITPACK_VERSION:-${JITPACK_COMMIT}}}
+    if [ -z "$VERSION" ]; then
+      VERSION=$(git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD)
+    fi
+
+    echo "Publishing version: $VERSION"
+
+    # Try to download pre-shadowed AAR from GitHub release
+    if wget "https://github.com/smile-cx/sio-android-scx/releases/download/${VERSION}/sio-android-scx-release.aar" -O sio-android-scx-release.aar 2>/dev/null; then
+      echo "✓ Found pre-shadowed AAR in GitHub releases"
+
+      # Extract AAR contents (already shadowed)
+      echo "Extracting pre-shadowed AAR..."
+      unzip -q -o sio-android-scx-release.aar -d extracted/
+
+      # Copy to module structure for republishing
+      mkdir -p app/libs
+      cp extracted/libs/shadow.jar app/libs/
+
+      rm -rf extracted/
+
+      # Verify it's already shadowed
+      echo "Verifying shadowed classes..."
+      if jar -tf app/libs/shadow.jar | grep -q "cx/smile/io/socket"; then
+        echo "✓ AAR is already shadowed"
+        jar -tf app/libs/shadow.jar | grep "cx/smile/io/socket" 2>/dev/null | head -3
+      else
+        echo "⚠️ Warning: AAR not shadowed, falling back to build from source"
+        rm -rf app/libs/shadow.jar
+      fi
+    else
+      echo "⚠️ Pre-shadowed AAR not found in releases, building from source..."
+    fi
+
+    # If pre-shadowed AAR not available, build from source
+    if [ ! -f "app/libs/shadow.jar" ]; then
+      echo "Building from source..."
+      ./gradlew clean :shadow:shadowJar :app:assembleRelease -PUPSTREAM_VERSION=${VERSION#v}
+    else
+      echo "Using pre-shadowed AAR, just reassembling..."
+      ./gradlew :app:assembleRelease -PUPSTREAM_VERSION=${VERSION#v}
+    fi
+
+    # Publish to Maven
+    echo "Publishing to Maven..."
+    ./gradlew :app:publishToMavenLocal -PUPSTREAM_VERSION=${VERSION#v}
 
 # JitPack will automatically publish the AAR
 env:

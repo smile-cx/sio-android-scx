@@ -19,16 +19,58 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Check if release exists
+        id: check_release
+        run: |
+          VERSION="v${{ github.event.inputs.version }}"
+
+          # Check if release exists
+          if gh release view "$VERSION" > /dev/null 2>&1; then
+            echo "Release $VERSION exists, checking if AAR is already shadowed..."
+
+            # Try to download existing AAR
+            if gh release download "$VERSION" -p "sio-android-scx-release.aar" --clobber 2>/dev/null; then
+              echo "✓ Found existing AAR in release"
+
+              # Check if already shadowed
+              mkdir -p check
+              unzip -q sio-android-scx-release.aar libs/shadow.jar -d check/ 2>/dev/null || true
+
+              if [ -f "check/libs/shadow.jar" ] && jar -tf check/libs/shadow.jar | grep -q "cx/smile/io/socket"; then
+                echo "✓ AAR is already shadowed - skipping build"
+                echo "already_shadowed=true" >> $GITHUB_OUTPUT
+                echo "skip_build=true" >> $GITHUB_OUTPUT
+              else
+                echo "AAR exists but not properly shadowed - will rebuild"
+                echo "already_shadowed=false" >> $GITHUB_OUTPUT
+                echo "skip_build=false" >> $GITHUB_OUTPUT
+              fi
+
+              rm -rf check/
+            else
+              echo "Release exists but no AAR found - will build"
+              echo "skip_build=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "Release does not exist - will build"
+            echo "skip_build=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - name: Set up JDK 17
+        if: steps.check_release.outputs.skip_build != 'true'
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
       - name: Setup Android SDK
+        if: steps.check_release.outputs.skip_build != 'true'
         uses: android-actions/setup-android@v3
 
       - name: Cache Gradle packages
+        if: steps.check_release.outputs.skip_build != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -39,14 +81,17 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Make scripts executable
+        if: steps.check_release.outputs.skip_build != 'true'
         run: chmod +x scripts/*.sh
 
       - name: Build release AAR
+        if: steps.check_release.outputs.skip_build != 'true'
         run: ./scripts/build-release.sh
         env:
           UPSTREAM_VERSION: ${{ github.event.inputs.version }}
 
       - name: Verify AAR contents
+        if: steps.check_release.outputs.skip_build != 'true'
         run: |
           echo "=== AAR Contents ==="
           unzip -l build/outputs/sio-android-scx-release.aar
@@ -86,16 +131,19 @@ jobs:
           rm -rf $TEMP_DIR
 
       - name: Generate checksum
+        if: steps.check_release.outputs.skip_build != 'true'
         run: |
           cd build/outputs
           sha256sum sio-android-scx-release.aar > sio-android-scx-release.aar.sha256
 
       - name: Copy license files to release output
+        if: steps.check_release.outputs.skip_build != 'true'
         run: |
           cp LICENSE build/outputs/LICENSE.txt
           cp NOTICE build/outputs/NOTICE.txt
 
       - name: Create and push tag
+        if: steps.check_release.outputs.skip_build != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -103,6 +151,7 @@ jobs:
           git push origin "v${{ github.event.inputs.version }}"
 
       - name: Create Release
+        if: steps.check_release.outputs.skip_build != 'true'
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
@@ -159,8 +208,38 @@ jobs:
           prerelease: false
 
       - name: Upload build artifacts
+        if: steps.check_release.outputs.skip_build != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: sio-android-scx-aar
           path: build/outputs/sio-android-scx-release.aar
           retention-days: 30
+
+      - name: Build Summary
+        run: |
+          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.check_release.outputs.skip_build }}" = "true" ]; then
+            echo "✓ Release v${{ github.event.inputs.version }} already exists with shadowed AAR" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Status**: Skipped build (AAR already shadowed)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "View release: https://github.com/${{ github.repository }}/releases/tag/v${{ github.event.inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ Successfully built and released Socket.IO v${{ github.event.inputs.version }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Artifacts Created" >> $GITHUB_STEP_SUMMARY
+            echo "- \`sio-android-scx-release.aar\`" >> $GITHUB_STEP_SUMMARY
+            echo "- \`sio-android-scx-release.aar.sha256\`" >> $GITHUB_STEP_SUMMARY
+            echo "- \`LICENSE.txt\` and \`NOTICE.txt\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Release" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Release created: https://github.com/${{ github.repository }}/releases/tag/v${{ github.event.inputs.version }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### JitPack" >> $GITHUB_STEP_SUMMARY
+            echo "The release will be available on JitPack shortly:" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`gradle" >> $GITHUB_STEP_SUMMARY
+            echo "implementation 'com.github.smile-cx:sio-android-scx:v${{ github.event.inputs.version }}'" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
