@@ -3,9 +3,6 @@ set -e
 
 echo "=== Building SCX Socket.IO Client Release ==="
 
-# Prepare upstream library (download from Maven Central)
-./scripts/prepare-upstream.sh
-
 # Build the shadowed and reassembled AAR
 echo "Building final AAR with shadowing..."
 ./gradlew clean :app:assembleRelease
