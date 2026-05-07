@@ -28,6 +28,9 @@ obj/
 .DS_Store
 Thumbs.db
 
+# Generated artifacts
+app/libs/*.jar
+
 # Downloaded source
 upstream-source/
 extracted/

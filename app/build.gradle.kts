@@ -62,7 +62,7 @@ afterEvaluate {
 
                 groupId = findProperty("GROUP") as String? ?: "cx.smile.socketio"
                 artifactId = findProperty("POM_ARTIFACT_ID") as String? ?: "sio-android-scx"
-                version = findProperty("VERSION_NAME") as String? ?: "2.1.0"
+                version = findProperty("VERSION_NAME") as String? ?: "2.1.1"
 
                 pom {
                     name.set("SCX Socket.IO Client")

@@ -24,7 +24,7 @@ repositories {
 Add dependency:
 ```gradle
 dependencies {
-    implementation 'com.github.smile-cx:sio-android-scx:2.1.0'
+    implementation 'com.github.smile-cx:sio-android-scx:2.1.1'
 }
 ```
 
