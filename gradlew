@@ -76,7 +76,7 @@ do
     link=${ls#*' -> '}
     case $link in             #(
       /*)   app_path=$link ;; #(
-      *)    app_path=$APP_HOME$link ;;
+      *)    app_path="$APP_HOME$link" ;;
     esac
 done
 
@@ -233,18 +233,13 @@ fi
 # character that might be a shell metacharacter, then use eval to parse
 # each arg into the shell's argument list.
 #
-# We need a new line, so create a newline character literally:
-nl='
-'
-# and a carriage return:
-cr=$'\r'
-# Put this in a temporary variable to avoid nested command substitution, which fails in bash < 5.0.
-xargs_out=$(xargs -n1 <<EOF
-"$@"
-EOF
-)
-eval "set -- $( echo "$xargs_out" |
-    sed -e 's/^/\\/;s/[^[:alnum:][:space:]\/\\.-]/\\&/g' |
-    tr -d "$nl$cr" )"
+# Because arguments may contain spaces, we use printf to output one arg per line
+# preserving the original argument boundaries, then wrap each in single quotes.
+#
+eval "set -- $(
+    printf '%s\n' "$@" |
+    sed -e "s/'/'\\\\''/g" -e "s/^/'/" -e "s/$/'/" |
+    tr '\n' ' '
+)"
 
 exec "$JAVACMD" "$@"
