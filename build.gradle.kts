@@ -5,15 +5,15 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:8.2.2")
+        classpath("com.android.tools.build:gradle:9.4.0")
     }
 }
 
 plugins {
-    id("com.android.library") version "8.2.2" apply false
-    id("com.github.johnrengelman.shadow") version "8.1.1" apply false
+    id("com.android.library") version "9.4.0" apply false
+    id("com.gradleup.shadow") version "9.6.1" apply false
 }
 
 tasks.register<Delete>("clean") {
-    delete(rootProject.buildDir)
+    delete(rootProject.layout.buildDirectory)
 }
